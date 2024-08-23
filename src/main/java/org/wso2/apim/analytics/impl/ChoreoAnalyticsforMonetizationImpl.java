@@ -11,7 +11,9 @@ import org.json.simple.JSONArray;
 import org.wso2.apim.analytics.impl.model.GraphQLClient;
 import org.wso2.apim.analytics.impl.model.GraphqlQueryModel;
 import org.wso2.apim.analytics.impl.model.graphQLResponseClient;
+import org.wso2.carbon.apimgt.api.APIManagementException;
 import org.wso2.carbon.apimgt.api.AnalyticsException;
+import org.wso2.carbon.apimgt.api.model.APIProduct;
 import org.wso2.carbon.apimgt.api.model.AnalyticsforMonetization;
 import org.wso2.carbon.apimgt.api.model.MonetizationUsagePublishInfo;
 import org.wso2.carbon.apimgt.impl.APIManagerConfiguration;
@@ -24,9 +26,17 @@ import org.wso2.carbon.apimgt.impl.APIConstants;
 import org.wso2.carbon.apimgt.impl.utils.APIUtil;
 import org.wso2.carbon.apimgt.persistence.APIPersistence;
 import org.wso2.carbon.apimgt.persistence.PersistenceManager;
+import org.wso2.carbon.apimgt.persistence.dto.PublisherAPIProduct;
 import org.wso2.carbon.user.api.Tenant;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
+import org.wso2.carbon.user.api.UserStoreException;
 import org.wso2.carbon.utils.multitenancy.MultitenantConstants;
+import org.wso2.carbon.apimgt.api.APIProvider;
+import org.wso2.carbon.apimgt.impl.APIManagerFactory;
+import org.wso2.carbon.apimgt.api.model.API;
+import org.wso2.carbon.apimgt.persistence.dto.Organization;
+import org.wso2.carbon.apimgt.persistence.dto.PublisherAPI;
+import org.wso2.carbon.apimgt.persistence.exceptions.APIPersistenceException;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -39,6 +49,7 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
     private static final Log log = LogFactory.getLog(ChoreoAnalyticsforMonetizationImpl.class);
     private static APIManagerConfiguration config = null;
     APIPersistence apiPersistenceInstance;
+
     /**
      * Gets Usage Data from Analytics Provider
      *
@@ -46,7 +57,6 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
      * @return usage data from analytics provider
      * @throws AnalyticsException if the action failed
      */
-
     @Override
     public Object getUsageData(MonetizationUsagePublishInfo lastPublishInfo) throws AnalyticsException {
 
@@ -195,7 +205,7 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
                                 monetizedAPIIdsList.add(api.getUUID());
                             }
                         } catch (APIPersistenceException e) {
-                            throw new MonetizationException("Failed to retrieve the API of UUID: " + api.getUUID(), e);
+                            throw new AnalyticsException("Failed to retrieve the API of UUID: " + api.getUUID(), e);
                         }
                     }
                     Map<String, Object> productMap = apiProviderNew.searchPaginatedAPIProducts("", tenant.getDomain(), 0,
@@ -216,11 +226,11 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
                         }
                     }
                 } catch (APIManagementException e) {
-                    throw new MonetizationException("Error while retrieving the Ids of Monetized APIs");
+                    throw new AnalyticsException("Error while retrieving the Ids of Monetized APIs");
                 }
             }
         } catch (UserStoreException e) {
-            throw new MonetizationException("Error while retrieving the tenants", e);
+            throw new AnalyticsException("Error while retrieving the tenants", e);
         }
         tenantsAndApis.add(tenantDomainList);
         tenantsAndApis.add(monetizedAPIIdsList);
