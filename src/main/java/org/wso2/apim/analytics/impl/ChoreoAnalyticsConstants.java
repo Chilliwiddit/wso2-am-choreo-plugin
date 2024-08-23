@@ -16,5 +16,6 @@ public class ChoreoAnalyticsConstants {
     public static final String API_USAGE_BY_APP_FILTER = "successAPIUsageByAppFilter";
     public static final String ON_PREM_KEY = "onPremKey";
     public static final String AT = "@";
+    public static final String PRODUCTS = "products";
 
 }
