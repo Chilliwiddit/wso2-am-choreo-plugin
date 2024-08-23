@@ -49,6 +49,7 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
     private static final Log log = LogFactory.getLog(ChoreoAnalyticsforMonetizationImpl.class);
     private static APIManagerConfiguration config = null;
     APIPersistence apiPersistenceInstance;
+    Long currentTimestamp;
 
     /**
      * Gets Usage Data from Analytics Provider
@@ -60,7 +61,6 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
     @Override
     public Object getUsageData(MonetizationUsagePublishInfo lastPublishInfo) throws AnalyticsException {
 
-        Long currentTimestamp;
         boolean useNewQueryAPI = true;
 
         Date dateobj = new Date();
