@@ -1,5 +1,6 @@
 package org.wso2.apim.analytics.impl;
 
+import com.google.gson.internal.LinkedTreeMap;
 import feign.Feign;
 import feign.gson.GsonDecoder;
 import feign.gson.GsonEncoder;
@@ -11,12 +12,11 @@ import org.json.simple.JSONArray;
 import org.wso2.apim.analytics.impl.model.GraphQLClient;
 import org.wso2.apim.analytics.impl.model.GraphqlQueryModel;
 import org.wso2.apim.analytics.impl.model.graphQLResponseClient;
-import org.wso2.carbon.apimgt.api.APIManagementException;
-import org.wso2.carbon.apimgt.api.AnalyticsException;
-import org.wso2.carbon.apimgt.api.model.APIProduct;
-import org.wso2.carbon.apimgt.api.model.AnalyticsforMonetization;
-import org.wso2.carbon.apimgt.api.model.MonetizationUsagePublishInfo;
+import org.wso2.carbon.apimgt.api.*;
+import org.wso2.carbon.apimgt.api.model.*;
+import org.wso2.carbon.apimgt.impl.APIAdminImpl;
 import org.wso2.carbon.apimgt.impl.APIManagerConfiguration;
+import org.wso2.carbon.apimgt.impl.dao.ApiMgtDAO;
 import org.wso2.carbon.apimgt.impl.internal.ServiceReferenceHolder;
 import org.apache.commons.lang.StringUtils;
 import org.wso2.carbon.apimgt.impl.internal.MonetizationDataHolder;
@@ -31,9 +31,7 @@ import org.wso2.carbon.user.api.Tenant;
 import org.wso2.carbon.context.PrivilegedCarbonContext;
 import org.wso2.carbon.user.api.UserStoreException;
 import org.wso2.carbon.utils.multitenancy.MultitenantConstants;
-import org.wso2.carbon.apimgt.api.APIProvider;
 import org.wso2.carbon.apimgt.impl.APIManagerFactory;
-import org.wso2.carbon.apimgt.api.model.API;
 import org.wso2.carbon.apimgt.persistence.dto.Organization;
 import org.wso2.carbon.apimgt.persistence.dto.PublisherAPI;
 import org.wso2.carbon.apimgt.persistence.exceptions.APIPersistenceException;
@@ -49,7 +47,8 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
     private static final Log log = LogFactory.getLog(ChoreoAnalyticsforMonetizationImpl.class);
     private static APIManagerConfiguration config = null;
     APIPersistence apiPersistenceInstance;
-    Long currentTimestamp;
+    boolean useNewQueryAPI = true;
+    private ApiMgtDAO apiMgtDAO = ApiMgtDAO.getInstance();
 
     /**
      * Gets Usage Data from Analytics Provider
@@ -60,8 +59,17 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
      */
     @Override
     public Object getUsageData(MonetizationUsagePublishInfo lastPublishInfo) throws AnalyticsException {
-
-        boolean useNewQueryAPI = true;
+        Long currentTimestamp;
+        APIAdmin apiAdmin = new APIAdminImpl();
+        String apiUuid = null;
+        String apiName = null;
+        String apiVersion = null;
+        String tenantDomain = null;
+        String applicationName = null;
+        String applicationOwner = null;
+        int applicationId;
+        String apiProvider = null;
+        Long requestCount = 0L;
 
         Date dateobj = new Date();
         SimpleDateFormat simpleDateFormat = new SimpleDateFormat(ChoreoAnalyticsConstants.TIME_FORMAT);
@@ -73,16 +81,16 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
             config = ServiceReferenceHolder.getInstance().getAPIManagerConfigurationService().
                     getAPIManagerConfiguration();
         }
-        //used for stripe recording
+
         currentTimestamp = getTimestamp(toDate);
-        //The implementation will be improved to use offset date time to get the time zone based on user input
+
         String formattedToDate = toDate.concat(ChoreoAnalyticsConstants.TIMEZONE_FORMAT);
         String fromDate = simpleDateFormat.format(
                 new java.util.Date(lastPublishInfo.getLastPublishTime()));
         //The implementation will be improved to use offset date time to get the time zone based on user input
         String formattedFromDate = fromDate.concat(ChoreoAnalyticsConstants.TIMEZONE_FORMAT);
 
-
+        //get usageData with all the dependency variables
         String queryApiEndpoint = config.getMonetizationConfigurationDto().getInsightAPIEndpoint();
         String onPremKey = config.getMonetizationConfigurationDto().getAnalyticsAccessToken();
         if (StringUtils.isEmpty(queryApiEndpoint) || StringUtils.isEmpty(onPremKey)) {
@@ -130,11 +138,46 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
                 queryModel.setQuery(getGraphQLQueryBasedOnTheOperationMode(useNewQueryAPI));
                 queryModel.setVariables(variables);
                 graphQLResponseClient usageResponse = graphQLClient.getSuccessAPIsUsageByApplications(queryModel);
-                return usageResponse.getData();
+
+                LinkedTreeMap<String, ArrayList<LinkedTreeMap<String, String>>> data = usageResponse.getData();
+
+                //processing takes place here
+                ArrayList<LinkedTreeMap<String, String>> usageData = new ArrayList<>();
+                if (data != null) {
+                    usageData = data.get((useNewQueryAPI) ?
+                            ChoreoAnalyticsConstants.GET_USAGE_BY_APPLICATION_WITH_ON_PREM_KEY
+                            : ChoreoAnalyticsConstants.GET_USAGE_BY_APPLICATION);
+                }
+
+
+
+                ArrayList<MonetizationUsageInfo> monetizationInfo = new ArrayList<>();
+
+                for (Map.Entry<String, ArrayList<LinkedTreeMap<String, String>>> entry : data.entrySet()){
+                    //String key = entry.getKey();
+                    //since key is never used it's been commented out
+                    ArrayList<LinkedTreeMap<String, String>> apiUsageDataCollection = entry.getValue();
+                    for (LinkedTreeMap<String, String> apiUsageData : apiUsageDataCollection) {
+                        apiUuid = apiUsageData.get(API_UUID);
+                        apiName = apiUsageData.get(ChoreoAnalyticsConstants.API_NAME);
+                        apiVersion = apiUsageData.get(ChoreoAnalyticsConstants.API_VERSION);
+                        tenantDomain = apiUsageData.get(ChoreoAnalyticsConstants.TENANT_DOMAIN);
+                        applicationName = apiUsageData.get(ChoreoAnalyticsConstants.APPLICATION_NAME);
+                        applicationOwner = apiUsageData.get(ChoreoAnalyticsConstants.APPLICATION_OWNER);
+                        requestCount = Long.parseLong(apiUsageData.get(ChoreoAnalyticsConstants.COUNT));
+
+                        MonetizationUsageInfo usageInfo = new MonetizationUsageInfo(currentTimestamp, apiUuid, apiName, apiVersion, tenantDomain, applicationName, applicationOwner, null, requestCount);
+                        monetizationInfo.add(usageInfo);
+                    }
+                }
+
+                //prccessing ends here
+                return monetizationInfo;//send the arraylist full of info objects out
             }
         }
         return null;
 
+        //process data
     }
 
     /**
