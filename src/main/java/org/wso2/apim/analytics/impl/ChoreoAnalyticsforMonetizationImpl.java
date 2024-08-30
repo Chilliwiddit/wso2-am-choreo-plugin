@@ -48,7 +48,6 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
     private static APIManagerConfiguration config = null;
     APIPersistence apiPersistenceInstance;
     boolean useNewQueryAPI = true;
-    private ApiMgtDAO apiMgtDAO = ApiMgtDAO.getInstance();
 
     /**
      * Gets Usage Data from Analytics Provider
@@ -60,15 +59,12 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
     @Override
     public Object getUsageData(MonetizationUsagePublishInfo lastPublishInfo) throws AnalyticsException {
         Long currentTimestamp;
-        APIAdmin apiAdmin = new APIAdminImpl();
         String apiUuid = null;
         String apiName = null;
         String apiVersion = null;
         String tenantDomain = null;
         String applicationName = null;
         String applicationOwner = null;
-        int applicationId;
-        String apiProvider = null;
         Long requestCount = 0L;
 
         Date dateobj = new Date();
@@ -118,7 +114,7 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
 
         List<JSONArray> tenantsAndApis = getMonetizedAPIIdsAndTenantDomains();
 
-        if (tenantsAndApis.size() == 2) {
+        if (tenantsAndApis.size() == 2) { //it should always be 2
             if (tenantsAndApis.get(1).size() > 0) {
                 JSONObject successAPIUsageByAppFilter = new JSONObject();
                 successAPIUsageByAppFilter.put(ChoreoAnalyticsConstants.API_ID_COL, tenantsAndApis.get(1));
@@ -127,7 +123,7 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
                 variables.put(ChoreoAnalyticsConstants.TIME_FILTER, timeFilter);
                 variables.put(ChoreoAnalyticsConstants.API_USAGE_BY_APP_FILTER, successAPIUsageByAppFilter);
                 if (useNewQueryAPI) {
-                    variables.put(ChoreoAnalyticsConstants.ON_PREM_KEY, onPremKey);
+                    variables.put(ChoreoAnalyticsConstants.ON_PREM_KEY, onPremKey);//puts which query to use
                 }
                 GraphQLClient graphQLClient =
                         Feign.builder().client(new OkHttpClient()).encoder(new GsonEncoder()).decoder(new GsonDecoder())
@@ -137,7 +133,7 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
                 GraphqlQueryModel queryModel = new GraphqlQueryModel();
                 queryModel.setQuery(getGraphQLQueryBasedOnTheOperationMode(useNewQueryAPI));
                 queryModel.setVariables(variables);
-                graphQLResponseClient usageResponse = graphQLClient.getSuccessAPIsUsageByApplications(queryModel);
+                graphQLResponseClient usageResponse = graphQLClient.getSuccessAPIsUsageByApplications(queryModel); //gets the data here
 
                 LinkedTreeMap<String, ArrayList<LinkedTreeMap<String, String>>> data = usageResponse.getData();
 
@@ -149,12 +145,15 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
                             : ChoreoAnalyticsConstants.GET_USAGE_BY_APPLICATION);
                 }
 
-
+                if (usageData.isEmpty()){
+                    return null; //will be handled in the publishData method in the Stripe plugin
+                }
 
                 ArrayList<MonetizationUsageInfo> monetizationInfo = new ArrayList<>();
 
                 for (Map.Entry<String, ArrayList<LinkedTreeMap<String, String>>> entry : data.entrySet()){
                     //String key = entry.getKey();
+
                     //since key is never used it's been commented out
                     ArrayList<LinkedTreeMap<String, String>> apiUsageDataCollection = entry.getValue();
                     for (LinkedTreeMap<String, String> apiUsageData : apiUsageDataCollection) {
