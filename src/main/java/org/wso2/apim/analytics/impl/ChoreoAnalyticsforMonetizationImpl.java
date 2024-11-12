@@ -152,7 +152,6 @@ public class ChoreoAnalyticsforMonetizationImpl implements AnalyticsforMonetizat
 
                 for (Map.Entry<String, ArrayList<LinkedTreeMap<String, String>>> entry : data.entrySet()){
                     //String key = entry.getKey();
-
                     //since key is never used it's been commented out
                     ArrayList<LinkedTreeMap<String, String>> apiUsageDataCollection = entry.getValue();
                     for (LinkedTreeMap<String, String> apiUsageData : apiUsageDataCollection) {
