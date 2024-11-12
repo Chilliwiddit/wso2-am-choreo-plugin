@@ -20,8 +20,6 @@ public class ChoreoAnalyticsConstants {
     public static final String COUNT = "count";
     public static final String GET_USAGE_BY_APPLICATION = "getSuccessAPIsUsageByApplications";
     public static final String GET_USAGE_BY_APPLICATION_WITH_ON_PREM_KEY = "getSuccessAPIsUsageByApplicationsWithOnPremKey";
-    public static final String COMPLETED = "COMPLETED";
-    public static final String SUCCESSFULL = "SUCCESSFULL";
     public static final String API_NAME = "apiName";
     public static final String API_VERSION = "apiVersion";
     public static final String API_UUID = "apiId";
